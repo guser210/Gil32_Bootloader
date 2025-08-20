@@ -25,22 +25,6 @@
 #define  WORD_SIZE  (0x04)
 #define PAGE_SIZE  (0x800)
 
-//typedef struct eeprom_settings_s{
-//	char name[12] ;		//		= {"Gil32"};
-//	uint8_t version;	// 		= 3;
-//	uint8_t sub_version;// 		= 5;
-//	uint8_t esc_config_layout;//	= 1;
-//	uint8_t protocol;		// 		= 1;
-//	uint8_t protocol_bi;	// 		= 1;
-//	uint8_t commutation_delay;// 	= 2;
-//	unsigned short startup_throttle;// = (THROTTLE_DELAY & 0xff)<<8 | (THROTTLE_DELAY>>8 & 0xff) ;//0x2c01; // 300=0x12c reversed.
-//	uint8_t turtle_rampup;// 		= 50;
-//	uint8_t motor_direction;// 			= 0x1;
-//	uint8_t padding2;// 			= 0xff;
-//	uint8_t padding3;// 			= 0xff;
-//
-//}eeprom_settings_t;
-
 typedef struct eeprom_settings_s{
 	char name[12]; // 			= {"Gil32"};		//		= {"Gil32"};
 	char description[64]; //	= {"Feature description goes here."};//
@@ -72,11 +56,8 @@ typedef struct eeprom_settings_s{
 
 }__attribute__((packed)) eeprom_settings_t;
 
-
-
 void read_memory(char *data, const uint16_t size, const uint32_t address);
 void write_eeprom(char *data, uint16_t size, uint32_t address);
-
 
 void write_memory(uint8_t* data,const uint16_t size,const uint32_t address) ;
 #endif /* INC_EEPROM_H_ */

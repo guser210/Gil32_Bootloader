@@ -21,7 +21,6 @@
 #include "eeprom.h"
 #include "bootloader.h"
 
-volatile uint8_t cmds[100] = {0};
 volatile uint32_t cmd_counter = 0;
 volatile uint8_t configurator_connected = 0;
 
@@ -74,12 +73,19 @@ eeprom_settings_t eeprom_settings = {.name = "Gil32"
 };
 
 
-
 uint8_t calculated_crc_low_byte;
 uint8_t calculated_crc_high_byte;
 static uint8_16_u CRC_16;
 
-
+void reset_timer()
+{
+	TIM2->CR1 &= ~TIM_CR1_CEN;
+//	TIM2->PSC = 63;
+//	TIM2->ARR = 0xffffffff;
+	TIM2->CNT = 0;
+	TIM2->CR1 |= TIM_CR1_CEN;
+//	TIM2->EGR |= 1;
+}
 
 static void ByteCrc(uint8_t *bt)
 {
@@ -115,62 +121,75 @@ void set_input()
 {
 
 	SIGNAL_PORT->MODER &= ~(GPIO_MODER_MODE4);
+	SIGNAL_PORT->PUPDR &= ~(GPIO_PUPDR_PUPD4_Msk);
+//	SIGNAL_PORT->PUPDR |= (GPIO_PUPDR_PUPD4_0);
 }
 void set_output()
 {
 	SIGNAL_PORT->MODER |= (GPIO_MODER_MODE4_0);
+//	SIGNAL_PORT->PUPDR |= (2<<8);
+//	SIGNAL_PORT->PUPDR |= (GPIO_PUPDR_PUPD4_0);
 }
 
-
-uint16_t receive_byte()
+uint16_t receive_byte( const uint16_t bytes_received)
 {
-	uint8_t result = 0;
+	volatile uint8_t result = 0;
+
 	TIM2->CNT = 0;
-
-	while( !(SIGNAL_PORT->IDR & SIGNAL_PIN) ){}
-
-	while(SIGNAL_PORT->IDR & SIGNAL_PIN)
+	while( !(SIGNAL_PORT->IDR & SIGNAL_PIN)   )
 	{
-		if( TIM2->CNT > BYTE_TIMEOUT)
+		if( TIM2->CNT > SIGNAL_LINE_RISE_TIMEOUT)
 		{
 			return ERROR;
 		}
 	}
 
-	wait_clock_cycles(UART_BIT_TIME>>1);
+	TIM2->CNT = 0;
+
+	while( (SIGNAL_PORT->IDR & SIGNAL_PIN)  )
+	{
+		if( TIM2->CNT > UART_BIT_TIME && bytes_received)
+		{
+			return ERROR;
+		}
+	}
+
+	wait_clock_cycles(UART_BIT_TIME_HALF);
 
 	for( uint8_t i = 0; i <= 7; i++)
 	{
 		wait_clock_cycles(UART_BIT_TIME);
+		if( (SIGNAL_PORT->IDR & SIGNAL_PIN))
+			result |= 1<<i;
 
-		result |=  (SIGNAL_PORT->IDR & SIGNAL_PIN) ? 1<<(i) : 0;
 	}
-	wait_clock_cycles(UART_BIT_TIME>>1);
+
+	wait_clock_cycles((UART_BIT_TIME_HALF+ 20) );
 
 	return result;
 }
 
-uint16_t receive_buffer(volatile uint8_t* buffer , uint16_t size )
+uint16_t receive_buffer(volatile uint8_t* buffer , const uint16_t buffer_size )
 {
 	set_input();
 
 	volatile uint16_t buffer_counter = 0;
-	uint16_t result = 0;
+	volatile uint16_t result = 0;
 
 	while(1)
 	{
-		result = receive_byte();
+		result = receive_byte(buffer_counter);
 		if( result != ERROR)
 		{
 			buffer[buffer_counter] = (uint8_t)result;
 
 			buffer_counter++;
-			if( buffer_counter>= size)
+			if( buffer_counter>= buffer_size)
 			{
 				jump_to_application();
 				return ERROR;
 			}
-			//buffer_counter %= size;
+
 		}
 		else if( buffer_counter > 0)
 		{
@@ -184,7 +203,6 @@ uint16_t receive_buffer(volatile uint8_t* buffer , uint16_t size )
 
 	return ERROR;
 }
-
 
 void transmit_byte(char charValue)
 {
@@ -203,8 +221,6 @@ void transmit_byte(char charValue)
 	SIGNAL_PORT->BSRR = SIGNAL_PIN;
 }
 
-
-
 void transmit_packet(volatile uint8_t *buffer, uint16_t size)
 {
 	set_output();
@@ -214,8 +230,15 @@ void transmit_packet(volatile uint8_t *buffer, uint16_t size)
 		 transmit_byte(buffer[i]);
 		 wait_clock_cycles(UART_BIT_TIME );
 	}
+	set_input();
 }
 
+void send_keep_alive_ack()
+{
+	set_output();
+	transmit_byte(0xC1);
+	set_input();
+}
 void send_ack(void)
 {
 	set_output();
@@ -252,18 +275,18 @@ void send_requested_buffer(void)
 	transmit_packet(outgoing_buffer, byte_len + 3);
 }
 
-void process_packet( uint16_t size)
+uint16_t process_packet( uint16_t size)
 {
 
 	if( size < 3)
-		return;
-
+	{
+		return ERROR;
+	}
 	uint8_t cmd = incoming_buffer[0];
 
 	uint16_t data_sum = 0;
 
 	makeCrc((uint8_t*)&incoming_buffer[0], size-2);
-
 
 	if( size == DEVICE_INFO_PACKET_SIZE)
 	{
@@ -271,7 +294,7 @@ void process_packet( uint16_t size)
 			data_sum += incoming_buffer[index];
 	}
 	if( data_sum == 910 || data_sum == 1030)
-	{ // BLHeli
+	{
 		transmit_packet(deviceInfo, 9);
 	}
 	else
@@ -280,14 +303,18 @@ void process_packet( uint16_t size)
 		{
 		    send_crc_error();
 		 	write_command_expected = 0;
-			return;
+
+		 	return ERROR;
 		}
 
-		cmds[cmd_counter++] = cmd; // TODO: debug.
-		cmd_counter %= sizeof(cmds); // TODO: debug.
+		cmd_counter++;
 
 		if (write_command_expected == 1 && size >= flash_buffer_len) {
 			cmd = INCOMING_BUFFER;
+		}else if(write_command_expected == 1)
+		{
+			send_crc_error();
+			return ERROR;
 		}
 
 		if ((cmd | incoming_buffer[1] | incoming_buffer[2]) == 0) {
@@ -296,8 +323,8 @@ void process_packet( uint16_t size)
 
 		write_command_expected = 0;
 
-
-		switch (cmd) {
+		switch (cmd)
+		{
 
 		case INCOMING_BUFFER: // incoming data to write.
 
@@ -307,8 +334,7 @@ void process_packet( uint16_t size)
 			break;
 
 		case RESTART_DEVICE:
-			jump_to_application();
-//			NVIC_SystemReset();
+			NVIC_SystemReset();
 			break;
 
 		case CMD_PROG_FLASH: // program eeprom.
@@ -319,9 +345,8 @@ void process_packet( uint16_t size)
 			break;
 
 		case CMD_READ_FLASH_SIL:
-			set_output();
+
 			send_requested_buffer();
-			set_input();
 
 			break;
 
@@ -348,6 +373,7 @@ void process_packet( uint16_t size)
 
 
 	}
+	return 0;
 }
 
 void jump_to_application(){
@@ -374,7 +400,7 @@ void jump_to_application(){
     jump_to_application();
 }
 
-void wait_clock_cycles(uint32_t cc)
+void wait_clock_cycles(const uint32_t cc)
 {
 	TIM2->CNT = 0;
 	while(TIM2->CNT < cc);
@@ -399,7 +425,7 @@ void setup(void)
 //	GPIOB->MODER |= (GPIO_MODER_MODE8_0);
 
 	SIGNAL_PORT->PUPDR &= ~(GPIO_PUPDR_PUPD4_Msk);
-	SIGNAL_PORT->PUPDR |= (GPIO_PUPDR_PUPD4_0);
+//	SIGNAL_PORT->PUPDR |= (GPIO_PUPDR_PUPD4_1);
 
 	LL_TIM_EnableCounter(TIM2);
 
@@ -408,9 +434,9 @@ void setup(void)
 }
 void process_comms(void)
 {
-	static uint16_t error_packets = 0;
+	static volatile uint16_t error_packets = 0;
 
-	uint16_t result = 0;
+	volatile uint16_t result = 0;
 
 	memset((void*)&incoming_buffer,0,BUFFER_SIZE);
 	result = receive_buffer(incoming_buffer, BUFFER_SIZE);
@@ -418,18 +444,18 @@ void process_comms(void)
 	if( result != ERROR)
 	{
 		configurator_connected = 1;
-		process_packet(result);
-		error_packets = 0;
-	}
-	else
-	{
-		if( error_packets++ >= 1000)
+		if( ERROR != process_packet(result) )
 		{
-			if( !configurator_connected)
-				jump_to_application();
 			error_packets = 0;
-			return;
 		}
+	}
+
+	if( error_packets++ >= 1000)
+	{
+		if( !configurator_connected)
+			jump_to_application();
+		error_packets = 0;
+		return;
 	}
 
 

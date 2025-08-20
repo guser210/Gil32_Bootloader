@@ -46,19 +46,21 @@
 
 #define BAUDRATE 19200
 #define UART_BIT_TIME (1000000/BAUDRATE)//52us * 64 cper_us.
+#define UART_BIT_TIME_HALF (UART_BIT_TIME>>1)
 
 #define DEVICE_INFO_PACKET_SIZE (0x11)
 
 #define DOUBLEWORD_SIZE (0x08)
 
-
+#define SIGNAL_LINE_RISE_TIMEOUT (5000)
+#define BYTE_START_TIMEOUT (500000)
 #define BYTE_TIMEOUT (500) // 500mils
 #define ERROR (0xffff)
 void wait_clock_cycles(uint32_t cc);
 void set_output();
 void set_input();
 void jump_to_application();
-uint16_t receive_buffer(volatile uint8_t* pbuffer , uint16_t size );
+uint16_t receive_buffer(volatile uint8_t* pbuffer , uint16_t buffer_size );
 void transmit_packet(volatile uint8_t *buffer, uint16_t size);
 
 
