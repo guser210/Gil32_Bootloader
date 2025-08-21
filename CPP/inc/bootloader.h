@@ -53,7 +53,7 @@
 #define DOUBLEWORD_SIZE (0x08)
 
 #define SIGNAL_LINE_RISE_TIMEOUT (5000)
-#define BYTE_START_TIMEOUT (500000)
+
 #define BYTE_TIMEOUT (500) // 500mils
 #define ERROR (0xffff)
 void wait_clock_cycles(uint32_t cc);

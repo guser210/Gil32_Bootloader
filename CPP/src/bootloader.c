@@ -19,7 +19,9 @@
 #include "string.h"
 
 #include "eeprom.h"
+#include "settings.h"
 #include "bootloader.h"
+
 
 volatile uint32_t cmd_counter = 0;
 volatile uint8_t configurator_connected = 0;
@@ -35,7 +37,6 @@ volatile uint8_t global_buffer[BUFFER_SIZE] = {0};
 volatile uint8_t outgoing_buffer[BUFFER_SIZE] = {0};
 
 uint8_t deviceInfo[9] = {0x34,0x37,0x31,0x56,0x47,0x06,0x06,0x01, 0x30};
-//uint8_t deviceInfo[9] = {0x34,0x37,0x31,0x69,0x47,0x06,0x06,0x01, 0x30};
 
 typedef union __attribute__ ((packed)) {
     uint8_t bytes[2];
@@ -75,20 +76,14 @@ eeprom_settings_t eeprom_settings = {.name = "Gil32"
 
 uint8_t calculated_crc_low_byte;
 uint8_t calculated_crc_high_byte;
-static uint8_16_u CRC_16;
 
-void reset_timer()
-{
-	TIM2->CR1 &= ~TIM_CR1_CEN;
-//	TIM2->PSC = 63;
-//	TIM2->ARR = 0xffffffff;
-	TIM2->CNT = 0;
-	TIM2->CR1 |= TIM_CR1_CEN;
-//	TIM2->EGR |= 1;
-}
+static uint8_16_u CRC_16;
 
 static void ByteCrc(uint8_t *bt)
 {
+	/*
+	 * AM32 function.
+	 */
     uint8_t xb = *bt;
     for (uint8_t i = 0; i < 8; i++)
     {
@@ -103,6 +98,9 @@ static void ByteCrc(uint8_t *bt)
 }
 void makeCrc(uint8_t* bytes, uint16_t size)
 {
+	/*
+	 * AM32 function.
+	 */
     int crc = 0;
 
     CRC_16.word = 0;
@@ -122,17 +120,19 @@ void set_input()
 
 	SIGNAL_PORT->MODER &= ~(GPIO_MODER_MODE4);
 	SIGNAL_PORT->PUPDR &= ~(GPIO_PUPDR_PUPD4_Msk);
-//	SIGNAL_PORT->PUPDR |= (GPIO_PUPDR_PUPD4_0);
+
 }
 void set_output()
 {
 	SIGNAL_PORT->MODER |= (GPIO_MODER_MODE4_0);
-//	SIGNAL_PORT->PUPDR |= (2<<8);
-//	SIGNAL_PORT->PUPDR |= (GPIO_PUPDR_PUPD4_0);
 }
 
 uint16_t receive_byte( const uint16_t bytes_received)
 {
+	/*
+	 * UART idle: Line high.
+	 * Start bit falling edge.
+	 */
 	volatile uint8_t result = 0;
 
 	TIM2->CNT = 0;
@@ -161,10 +161,9 @@ uint16_t receive_byte( const uint16_t bytes_received)
 		wait_clock_cycles(UART_BIT_TIME);
 		if( (SIGNAL_PORT->IDR & SIGNAL_PIN))
 			result |= 1<<i;
-
 	}
 
-	wait_clock_cycles((UART_BIT_TIME_HALF+ 20) );
+	wait_clock_cycles( UART_BIT_TIME );
 
 	return result;
 }
@@ -206,6 +205,10 @@ uint16_t receive_buffer(volatile uint8_t* buffer , const uint16_t buffer_size )
 
 void transmit_byte(char charValue)
 {
+	/*
+	 * UART idle: Line high.
+	 * Start bit falling edge.
+	 */
 	char bits = 0;
 	SIGNAL_PORT->BRR = SIGNAL_PIN;
 
@@ -277,7 +280,6 @@ void send_requested_buffer(void)
 
 uint16_t process_packet( uint16_t size)
 {
-
 	if( size < 3)
 	{
 		return ERROR;
@@ -420,12 +422,7 @@ void init_eeprom(void)
 
 void setup(void)
 {
-//	GPIOB->BRR = LL_GPIO_PIN_8;
-//	GPIOB->MODER &= ~(GPIO_MODER_MODE8);
-//	GPIOB->MODER |= (GPIO_MODER_MODE8_0);
-
 	SIGNAL_PORT->PUPDR &= ~(GPIO_PUPDR_PUPD4_Msk);
-//	SIGNAL_PORT->PUPDR |= (GPIO_PUPDR_PUPD4_1);
 
 	LL_TIM_EnableCounter(TIM2);
 
@@ -450,14 +447,13 @@ void process_comms(void)
 		}
 	}
 
-	if( error_packets++ >= 1000)
+	if( error_packets++ >= 200)
 	{
 		if( !configurator_connected)
 			jump_to_application();
 		error_packets = 0;
 		return;
 	}
-
 
 }
 void main_program(void)
