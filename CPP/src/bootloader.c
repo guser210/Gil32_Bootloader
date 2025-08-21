@@ -38,11 +38,16 @@ volatile uint8_t outgoing_buffer[BUFFER_SIZE] = {0};
 
 uint8_t deviceInfo[9] = {0x34,0x37,0x31,0x56,0x47,0x06,0x06,0x01, 0x30};
 
+uint16_t to_big_endiean(uint16_t value)
+{
+	return  (uint16_t)( ((value>>8) & 0xff) | ((value<<8) & 0xffff));
+}
 typedef union __attribute__ ((packed)) {
     uint8_t bytes[2];
     uint16_t word;
 } uint8_16_u;
-const unsigned short  THROTTLE_DELAY = 300;
+const uint16_t  THROTTLE_DELAY = 300;
+const uint16_t RAMPUP = 2048;
 eeprom_settings_t eeprom_settings = {.name = "Gil32"
 								,.description = "Feature description goes here."
 								,.version=3
@@ -51,7 +56,7 @@ eeprom_settings_t eeprom_settings = {.name = "Gil32"
 								,.commutation_delay = 2
 								,.startup_throttle = THROTTLE_DELAY
 								,.turtle_rampup = 50
-								,.rampup = 0
+								,.rampup = RAMPUP
 								,.motor_direction = 1
 								,.motor_direction = 0xff
 								,.feature1 = 0xff
@@ -410,7 +415,11 @@ void wait_clock_cycles(const uint32_t cc)
 
 void init_eeprom(void)
 {
+	eeprom_settings.startup_throttle = to_big_endiean(eeprom_settings.startup_throttle);
+	eeprom_settings.rampup = to_big_endiean(eeprom_settings.rampup);
 	eeprom_settings_t readmem;
+
+
 	memset((void*) &readmem, 0, sizeof(eeprom_settings_t));
 
 	read_memory((char*) &readmem, sizeof(eeprom_settings_t), EEPROM_ADDRESS);
