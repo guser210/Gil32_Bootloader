@@ -58,8 +58,8 @@ eeprom_settings_t eeprom_settings = {.name = "Gil32"
 								,.turtle_rampup = 50
 								,.rampup = RAMPUP
 								,.motor_direction = 1
-								,.motor_direction = 0xff
-								,.feature1 = 0xff
+								,.motor_direction = 0x01
+								,.motor_direction = 0x00
 								,.feature2 = 0xff
 								,.feature3 = 0xff
 								,.feature4 = 0xff
