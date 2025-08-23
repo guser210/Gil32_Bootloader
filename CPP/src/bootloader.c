@@ -50,8 +50,8 @@ const uint16_t  THROTTLE_DELAY = 300;
 const uint16_t RAMPUP = 2048;
 eeprom_settings_t eeprom_settings = {.name = "Gil32"
 								,.description = "Feature description goes here."
-								,.version=3
-								,.sub_version = 5
+								,.version=1
+								,.sub_version = 1
 								,.esc_config_layout = 1
 								,.commutation_delay = 2
 								,.startup_throttle = THROTTLE_DELAY
@@ -272,7 +272,7 @@ void send_requested_buffer(void)
 
 	uint16_t byte_len = incoming_buffer[1];
 
-	read_memory((char*) &outgoing_buffer, byte_len, flash_address);
+	read_memory((uint8_t*) &outgoing_buffer, byte_len, flash_address);
 
 	makeCrc((uint8_t*)&outgoing_buffer, byte_len);
 

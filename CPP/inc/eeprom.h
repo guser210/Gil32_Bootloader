@@ -27,8 +27,8 @@
 
 
 
-void read_memory(char *data, const uint16_t size, const uint32_t address);
-void write_eeprom(char *data, uint16_t size, uint32_t address);
+void read_memory(uint8_t *data, const uint16_t size, const uint32_t address);
+void write_eeprom(uint8_t *data, uint16_t size, uint32_t address);
 
 void write_memory(uint8_t* data,const uint16_t size,const uint32_t address) ;
 #endif /* INC_EEPROM_H_ */
