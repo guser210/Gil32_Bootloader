@@ -265,7 +265,7 @@ void send_command_error(void)
 	set_input();
 }
 
-volatile eeprom_settings_t ee;
+
 void send_requested_buffer(void)
 {
 	memset((uint8_t*) &outgoing_buffer[0], 0, sizeof(outgoing_buffer));
@@ -273,9 +273,6 @@ void send_requested_buffer(void)
 	uint16_t byte_len = incoming_buffer[1];
 
 	read_memory((uint8_t*) &outgoing_buffer, byte_len, flash_address);
-
-	memcpy((void*)&ee, (const void*)& outgoing_buffer, byte_len);
-
 
 	makeCrc((uint8_t*)&outgoing_buffer, byte_len);
 
