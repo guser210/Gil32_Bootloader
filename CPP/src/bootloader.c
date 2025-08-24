@@ -60,8 +60,7 @@ eeprom_settings_t eeprom_settings = {.name = "Gil32"
 								,.motor_direction = 1
 								,.motor_direction = 0x01
 								,.motor_direction = 0x00
-								,.feature2 = 0xff
-								,.feature3 = 0xff
+								,.firmware_deadtime = 0x190
 								,.feature4 = 0xff
 								,.feature5 = 0xff
 								,.feature6 = 0xff
@@ -266,6 +265,7 @@ void send_command_error(void)
 	set_input();
 }
 
+volatile eeprom_settings_t ee;
 void send_requested_buffer(void)
 {
 	memset((uint8_t*) &outgoing_buffer[0], 0, sizeof(outgoing_buffer));
@@ -273,6 +273,9 @@ void send_requested_buffer(void)
 	uint16_t byte_len = incoming_buffer[1];
 
 	read_memory((uint8_t*) &outgoing_buffer, byte_len, flash_address);
+
+	memcpy((void*)&ee, (const void*)& outgoing_buffer, byte_len);
+
 
 	makeCrc((uint8_t*)&outgoing_buffer, byte_len);
 
@@ -417,6 +420,7 @@ void init_eeprom(void)
 {
 	eeprom_settings.startup_throttle = to_big_endiean(eeprom_settings.startup_throttle);
 	eeprom_settings.rampup = to_big_endiean(eeprom_settings.rampup);
+	eeprom_settings.firmware_deadtime = to_big_endiean(eeprom_settings.firmware_deadtime);
 	eeprom_settings_t readmem;
 
 
