@@ -16,8 +16,9 @@
 void read_memory(uint8_t *data, uint16_t size, uint32_t address)
 {
 	if( address < APPLICATION_ADDRESS)
+	{
 		return;
-
+	}
 	uint32_t pEEPROM =  (BASE_ADDRESS + address);
 	memcpy((void*)data,(const void**)pEEPROM, size);
 }
