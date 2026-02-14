@@ -341,7 +341,8 @@ uint16_t process_packet( uint16_t size)
 			break;
 
 		case RESTART_DEVICE:
-			NVIC_SystemReset();
+			jump_to_application();
+//			NVIC_SystemReset();
 			break;
 
 		case CMD_PROG_FLASH: // program eeprom.
